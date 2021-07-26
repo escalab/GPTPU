@@ -1,0 +1,3 @@
+#./backprop 65536
+./backprop 1024
+
