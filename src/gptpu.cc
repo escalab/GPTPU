@@ -68,7 +68,7 @@ char ZERO_POINT = 0; // only for develoing use
 int TPU_ID  = 0;
 int ITER    = 1; 
 int VERBOSE = -1; //-1, or 0 - 10(max)
-int ramdisk = 0;
+int ramdisk = 1;
 int BREAKDOWN = 0; // for timming breakdown
 int exact_mode = 0;
 int start_chunk = 0;
@@ -274,11 +274,11 @@ openctpu_buffer::~openctpu_buffer(){
 }
 
 void openctpu_buffer::set_config(openctpu_config* config){  
-  if(config->get_data_type() == 1/*float*/){
-    config->set_exact_mode(false);
-    config->set_mm256_mode(false);
-    config->set_chunk_num(8);
-  }
+//  if(config->get_data_type() == 1/*float*/){
+//    config->set_exact_mode(false);
+//    config->set_mm256_mode(false);
+//    config->set_chunk_num(8);
+//  }
   this->config = config;  
 }
 
@@ -649,6 +649,8 @@ openctpu_dimension* openctpu_alloc_dimension(int dim, ...){
 
 openctpu_buffer* openctpu_create_buffer(openctpu_dimension* dim, void* data, openctpu_config* config, bool b_major, int tensor_type){
 // there are three types of buffer: model, input data, output buffer
+std::cout << "config.exact_mode: " << config->get_exact_mode() << std::endl;
+std::cout << "config.mm256_mode: " << config->get_mm256_mode() << ", tensor type: " << tensor_type << std::endl;
   openctpu_buffer* ret = new openctpu_buffer();
   ret->set_config(config);
   ret->set_flags(b_major, tensor_type); // set tensor-wise flag only
@@ -663,13 +665,14 @@ openctpu_buffer* openctpu_create_buffer(openctpu_dimension* dim, void* data, ope
   //struct TILE_INFO tile_info;
   int IN_W, IN_H, IN_C, OUT_C, F_W, F_H, S_W, S_H;
   int type        = ret->config->get_data_type();
-  if(type == 1){
-    ret->config->set_blks(x,y,z); // for float, no need to do sub-blocking
-  }
+//  if(type == 1){
+//    ret->config->set_blks(x,y,z); // for float, no need to do sub-blocking
+//  }
   ret->config->get_blks(blk_A, blk_B, blk_C);
-  bool exact_mode = (type == 0)?(ret->config->get_exact_mode()):(false/*float must be approx. mode*/);
+  std::cout << "A: " << A << ", B: " << B << ", C: " << C << ", blk_A: " << blk_A << ", blk_B: " << blk_B << ", blk_C: " << blk_C << std::endl;
+  bool exact_mode = ret->config->get_exact_mode();
   int chunk_num   = ret->config->get_chunk_num();
-  bool mm256_mode = (type == 0)?(ret->config->get_mm256_mode()):(false);
+  bool mm256_mode = ret->config->get_mm256_mode();
   if(ret->get_data_type() == 1 && ret->get_is_out() == 0){ // model type, create model_path
     set_exact_mode(exact_mode);
     ret->get_dims(B, C, dummy);
@@ -701,9 +704,9 @@ openctpu_buffer* openctpu_create_buffer(openctpu_dimension* dim, void* data, ope
       INN_BLK_REM = tile_info.INN_BLK_REM;
       COL_BLK_REM = tile_info.COL_BLK_REM;
     }
-//    std::cout << "A: " << A << ", B: " << B << ", C: " << C << ", blk_A: " << blk_A << ", blk_B: " << blk_B << ", blk_C: " << blk_C << ", data_array_size: " << data_array_size << std::endl;
+    std::cout << "A: " << A << ", B: " << B << ", C: " << C << ", blk_A: " << blk_A << ", blk_B: " << blk_B << ", blk_C: " << blk_C << ", data_array_size: " << data_array_size << std::endl;
     ret->get_conv_shape(IN_W, IN_H, IN_C, OUT_C, F_W, F_H, S_W, S_H);
-std::cout << __func__ << ": IN_W: " << IN_W << ",IN_H: " << IN_H << ",IN_C: " << IN_C << ",OUT_C: " << OUT_C << ",F_W: " << F_W << ",F_H: " << F_H << std::endl;
+//std::cout << __func__ << ": IN_W: " << IN_W << ",IN_H: " << IN_H << ",IN_C: " << IN_C << ",OUT_C: " << OUT_C << ",F_W: " << F_W << ",F_H: " << F_H << std::endl;
     char* data_array = (char*) malloc(data_array_size*sizeof(char));
     bool template_created = false;
     std::string template_name = "conv_temp_"+itoa(IN_W)+"x"+itoa(IN_H)+"x"+itoa(IN_C)+"x"+itoa(F_W)+"x"+itoa(F_H)+"x"+itoa(S_W)+"x"+itoa(S_H)+"_"+data_type+".tflite";
@@ -741,14 +744,21 @@ std::cout << __func__ << ": matrix_path " << matrix_path << ", data_dir: " << da
                 create_mm2conv_tflite(template_path, flatbufs, /*matrix_path*/model_id, data_array, blk_A, blk_B, blk_C, SCALE, 1/*dummy*/); // create .tflite binary
               }
             }else{ // 1:float   
-              set_mm2conv_array(data_int, ret->get_b_major(), data_array, B, C, i, j, INN_BLK_CNT, COL_BLK_CNT, blk_B, blk_C, INN_BLK_REM, COL_BLK_REM, w_chunk_idx, false/*exact_mode*/); // relayout data array
+              if(mm256_mode == true){
+                set_mm256conv_array(data_int, b_major, data_array, B, C, i, j, INN_BLK_CNT, COL_BLK_CNT, blk_B, blk_C, INN_BLK_REM, COL_BLK_REM, chunk_num, 1/*exact_mode*/); // relayout data array
+                create_mm2conv_tflite(template_path, flatbufs, /*matrix_path*/model_id, data_array, blk_A*chunk_num, blk_B, blk_C*chunk_num, SCALE, chunk_num); // create .tflite binary
+              }else{
+                set_mm2conv_array(data_int, ret->get_b_major(), data_array, B, C, i, j, INN_BLK_CNT, COL_BLK_CNT, blk_B, blk_C, INN_BLK_REM, COL_BLK_REM, w_chunk_idx, exact_mode); // relayout data array
+                create_mm2conv_tflite(template_path, flatbufs, /*matrix_path*/model_id, data_array, blk_A, blk_B, blk_C, SCALE, 1/*dummy*/); // create .tflite binary
+              }
               //create_mm2conv_tflite(template_path, flatbufs, /*matrix_path*/model_id, data_array, blk_A, blk_B, blk_C, SCALE, 1/*dummy*/); // create .tflite binary
-              create_mm2conv_tflite(template_path, matrix_path, data_array, blk_A, blk_B, blk_C, SCALE, 1/*dummy*/); // create .tflite binary
+              //create_mm2conv_tflite(template_path, matrix_path, data_array, blk_A, blk_B, blk_C, SCALE, 1/*dummy*/); // create .tflite binary
             }
             // build as model and ready to go
             //build_model_from_buffer(flatbufs[model_id].buf, flatbufs[model_id].size, /*matrix_path,*/ model_id);
-            build_model(matrix_path, model_id);
+            //build_model(matrix_path, model_id);
           }
+          build_model_from_buffer(flatbufs[model_id].buf, flatbufs[model_id].size, /*matrix_path,*/ model_id);
         }
       }
     }
@@ -782,15 +792,15 @@ std::cout << __func__ << ": matrix_path " << matrix_path << ", data_dir: " << da
     ret->get_dims(A, C, dummy);
     B = C;
     SET_BLK(ret, A, B, C, ROW_BLK_CNT, INN_BLK_CNT, COL_BLK_CNT, ROW_BLK_REM, INN_BLK_REM, COL_BLK_REM);
-    if(mm256_mode == true && type == 0){
+    if(mm256_mode == true /*&& type == 0*/){
       ret->set_mm256_conv_shape(chunk_num);
     }else{
       mm2conv_shape_mapping(A, B, C, blk_A, blk_B, blk_C, exact_mode, IN_W, IN_H, IN_C, F_W, F_H, S_W, S_H, OUT_C);
       ret->set_conv_shape(IN_W, IN_H, IN_C, OUT_C, F_W, F_H, S_W, S_H);
       ret->set_tile_info(A, B, C, blk_A, blk_B, blk_C);
     }
-    ret->set_int_or_float(type);
-    ret->allocate_c(data, type, (type == 1/*float*/)?0:mm256_mode);  // keep the pointer to data for populating result later
+    //ret->set_int_or_float(type);
+    ret->allocate_c(data, type, mm256_mode);  // keep the pointer to data for populating result later
   }
   return ret;
 }
@@ -809,7 +819,7 @@ void openctpu_invoke_operator(const std::string op, openctpu_buffer* tensor_a, o
   tensor_a->get_maxmin(a_max, a_min);
   tensor_b->get_maxmin(b_max, b_min);
   float IN_SCALE = 1.0;
-  if(op == mm_model && tensor_c->config->get_data_type() == 1){
+  if(op == mm_model /*&& tensor_c->config->get_data_type() == 1*/){
     IN_SCALE = float(UCHAR_MAX)/float(tile_info.B * ((float)(a_max + a_min)/2) * ((float)(b_max + b_min)/2));
     //std::cout << __func__ << ", IN_SCALE: " << IN_SCALE << "B: " << tile_info.B << ", a_max: " << a_max << ", a_min: " << a_min << ", b_max: " << b_max << ", b_min: " << b_min << std::endl;
    }//else{
@@ -823,7 +833,6 @@ void openctpu_invoke_operator(const std::string op, openctpu_buffer* tensor_a, o
         curr_node[cnt].op             = mm_model;
         curr_node[cnt].model_id       = (mm256_mode == true)?(j*tile_info.COL_BLK_CNT+k):((j*tile_info.COL_BLK_CNT+k)*chunk_num+w_chunk_idx);
         curr_node[cnt].a_feed         = tensor_a->a_feed;
-std::cout << "j: " << j << ", k: " << k << ", mm256_mode: " << mm256_mode << std::endl;
         curr_node[cnt].partial_c      = (mm256_mode == true)?tensor_c->blk_exact_c[j]:tensor_c->partial_c;      
         curr_node[cnt].A              = tile_info.A;      
         curr_node[cnt].B              = tile_info.B;      

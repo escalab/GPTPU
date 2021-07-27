@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <gptpu.h>
 
-typedef int TYPE;
+typedef float TYPE;
 
 float SCALE = 1.0;
 
@@ -54,8 +54,8 @@ int main(int argc, char **argv){
   for(int i = 0 ; i < size*size; i++){
     a[i] = rand()%a_range+a_m;
     b[i] = rand()%b_range+b_m;
-//    a[i] = (float)rand()/(float)(RAND_MAX/a_range);
-//    b[i] = (float)rand()/(float)(RAND_MAX/b_range);
+    a[i] = (float)rand()/(float)(RAND_MAX/a_range);
+    b[i] = (float)rand()/(float)(RAND_MAX/b_range);
   }  
 
 // open device
@@ -64,12 +64,12 @@ int main(int argc, char **argv){
    2. # of devices you want to open. (constrainted by max # of devices available)
    Note: You cannot re-call this function to open other devices in system. (TODO: enable this feature)
 */
-  openctpu_init(1, 1); 
+  openctpu_init(0, 1); 
 
 // kernel-wise config
   // arguments 2 - 4 are only effective if data type is 0
   // if data tpe is 1, must be approx. mode with quantization
-  auto config = openctpu_setConfig(0/*data type: 0: int, 1: float*/, true/*exact_mode*/, true/*mm256_mode*/, 8/*chunk_num*/);
+  auto config = openctpu_setConfig(1/*data type: 0: int, 1: float*/, true/*exact_mode*/, true/*mm256_mode*/, 8/*chunk_num*/);
 
   matrix_a_d = openctpu_alloc_dimension(2, size, size);
   matrix_b_d = openctpu_alloc_dimension(2, size, size);

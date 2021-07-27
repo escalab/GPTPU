@@ -51,6 +51,7 @@ run:
 	./app/gaussian-elimination-pthreads-openmp/openmp.out 1024 1 1
 	./app/rodinia_3.1/openmp/lud/omp/lud_omp -s 1024
 	./app/rodinia_3.1/openmp/backprop/backprop 1024
+	./obj/openctpu
 	./obj/run_a_pagerank ./src/pagerank_1K_iter1_edgetpu.tflite 1 1024
 
 #	./app/rodinia_3.1/cuda/hotspot3D/3D 1024 1 1 ./app/rodinia_3.1/data/hotspot3D/power_8192x8 ./app/rodinia_3.1/data/hotspot3D/temp_8192x8 #output.out
