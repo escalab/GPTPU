@@ -130,10 +130,10 @@ int main(int argc, char **argv) {
   initialize_inputs();
 
   /* Print input matrices */
-//  print_inputs();
+  print_inputs();
 
   /* Start Clock */
-//  printf("\nStarting clock.\n");
+  printf("\nStarting clock.\n");
   gettimeofday(&etstart, &tzdummy);
   etstart2 = times(&cputstart);
 
@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
   /* Stop Clock */
   gettimeofday(&etstop, &tzdummy);
   etstop2 = times(&cputstop);
-//  printf("Stopped clock.\n");
+  printf("Stopped clock.\n");
   usecstart = (unsigned long long)etstart.tv_sec * 1000000 + etstart.tv_usec;
   usecstop = (unsigned long long)etstop.tv_sec * 1000000 + etstop.tv_usec;
 
@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
 		  (cputstart.tms_cutime + cputstart.tms_cstime) ) /
 	 (float)CLOCKS_PER_SEC * 1000);
       /* Contrary to the man pages, this appears not to include the parent */
-//  printf("--------------------------------------------\n");
+  printf("--------------------------------------------\n");
 
   exit(0);
 }
@@ -184,7 +184,7 @@ void gauss() {
 			* element row and col */
   float multiplier;
 
-//  printf("Computing Serially.\n");
+  printf("Computing Serially.\n");
 
   /* Gaussian elimination */
   for (norm = 0; norm < N - 1; norm++) {

@@ -48,7 +48,7 @@ simple.o:
 
 run:
 	./app/pkgs/apps/blackscholes/src/blackscholes 1 ./app/pkgs/apps/blackscholes/src/input_1024x1024.txt ./app/pkgs/apps/blackscholes/src/out.txt	
-	./app/gaussian-elimination-pthreads-openmp/openmp.out 1024 1 1
+	./app/gaussian-elimination-pthreads-openmp/openmp.out 16 1 1
 	./app/rodinia_3.1/openmp/lud/omp/lud_omp -s 1024
 	./app/rodinia_3.1/openmp/backprop/backprop 1024
 	./obj/openctpu

@@ -67,12 +67,12 @@ void parameters(int argc, char **argv) {
   if (argc == 4) {
     seed = atoi(argv[3]);
     srand(seed);
-//    printf("Random seed = %i\n", seed);
+    printf("Random seed = %i\n", seed);
   }
   if (argc >= 3) {
     seed = atoi(argv[2]);
     NumThreads = seed;
-//    printf("# of open threads = %i\n", seed);
+    printf("# of open threads = %i\n", seed);
   }
   if (argc >= 2) {
     N = atoi(argv[1]);
@@ -91,20 +91,6 @@ void parameters(int argc, char **argv) {
   printf("\nMatrix dimension N = %i.\n", N);
 }
 
-/* Initialize A and B (and X to 0.0s) */
-void initialize_inputs() {
-  int row, col;
-
-//  printf("\nInitializing...\n");
-  for (col = 0; col < N; col++) {
-    for (row = 0; row < N; row++) {
-      cpu_A[row][col] = tpu_A[row][col] = (rand() / (float)RAND_MAX) * 65536;//2147483648; //  rand()%10;//(float)rand() / 32768.0;
-    }
-    cpu_B[col] = tpu_B[col] = (rand() / (float)RAND_MAX) * 65536;//2147483648;// rand()%10;//(float)rand() / 32768.0;
-    cpu_X[col] = tpu_X[col] = 0.0;
-  }
-
-}
 
 /* Print input matrices */
 void print_inputs(float** A, float* B) {
@@ -131,26 +117,43 @@ void print_X(float* X) {
       printf("%5.2f%s", X[row], (row < N-1) ? "; " : "]\n");
     }
 }
+/* Initialize A and B (and X to 0.0s) */
+void initialize_inputs() {
+  int row, col;
+  printf("\nInitializing...\n");
+  for (row = 0; row < N; row++) {
+    for (col = 0; col < N; col++) {
+      if(row == 0 || col == 0){
+        cpu_A[row][col] = tpu_A[row][col] = 1;
+      }else{
+        cpu_A[row][col] = tpu_A[row][col] = cpu_A[row-1][col-1] + cpu_A[row-1][col];
+      }
+    }
+    cpu_B[row] = tpu_B[row] = cpu_A[row][N-1];
+    cpu_X[row] = tpu_X[row] = 0.0;
+  }
+//  exit(0);
+}
 
 void compare_X(float* cpu_X, float* tpu_X){
   int cnt = 0;
   for(int i = 0 ; i < N ; i++){
     if(abs(cpu_X[i] - tpu_X[i]) > 1e-5){
       cnt += 1;
-//      if(cnt < 10){
-//        printf("wrong: cpu_X[%d]: %f | tpu_X[%d]: %f\n", i, cpu_X[i], i , tpu_X[i]);
-//      }
+      if(cnt < 10){
+        printf("wrong: cpu_X[%d]: %f | tpu_X[%d]: %f\n", i, cpu_X[i], i , tpu_X[i]);
+      }
     }else{
-//      if(i < 10){
-//        printf("cpu_X[%d]: %f | tpu_X[%d]: %f\n", i, cpu_X[i], i , tpu_X[i]);
-//      }
+      if(i < 10){
+        printf("cpu_X[%d]: %f | tpu_X[%d]: %f\n", i, cpu_X[i], i , tpu_X[i]);
+      }
     }
   }
-  if(cnt == 0){
-    printf("Verify pass!\n");
-  }else{
-    printf("Verify fail, (%d/%d)\n", cnt, N);
-  }
+//  if(cnt == 0){
+//    printf("Verify pass!\n");
+//  }else{
+//    printf("Verify fail, (%d/%d)\n", cnt, N);
+//  }
 
   double avg = 0;
   double rate = 0;
@@ -163,6 +166,13 @@ void compare_X(float* cpu_X, float* tpu_X){
   double RMSE = sqrt(square_sum_avg);
   std::cout << "RMSE: " << RMSE << ", blas_c avg: " << avg << ", RMSE pecentage: " << (RMSE/avg)*100 << "%" << ", error rate: " << (rate/avg)*100 << "%" << std::endl;
 
+}
+void mul(int* rows_int, int* mf_int, int* rows_int2, int A, int B){
+  for(int i = 0 ; i < A ; i++){
+    for(int j= 0 ; j < B ; j++){
+      rows_int[i*B+j] = mf_int[i*B+j] * rows_int2[i*B+j];
+    }
+  }
 }
 
 int main(int argc, char **argv) {
@@ -191,25 +201,27 @@ int main(int argc, char **argv) {
   initialize_inputs();
 
   /* Print input matrices */
-//  print_inputs(cpu_A, cpu_B);
+  print_inputs(cpu_A, cpu_B);
 
   /* Start Clock */
-//  printf("\nStarting clock.\n");
+  printf("\nStarting clock.\n");
   gettimeofday(&etstart, &tzdummy);
   etstart2 = times(&cputstart);
 
   /* Gaussian Elimination */
   gauss();
+  print_X(cpu_X);
   gauss_tpu();
   /* Stop Clock */
   gettimeofday(&etstop, &tzdummy);
   etstop2 = times(&cputstop);
-//  printf("Stopped clock.\n");
+  printf("Stopped clock.\n");
   usecstart = (unsigned long long)etstart.tv_sec * 1000000 + etstart.tv_usec;
   usecstop = (unsigned long long)etstop.tv_sec * 1000000 + etstop.tv_usec;
 
   /* Compare output */
   compare_X(cpu_X, tpu_X);
+  //compare_X(cpu_B, tpu_B);
 
   /* Display timing results */
   printf("\nElapsed time = %g ms.\n",
@@ -262,12 +274,15 @@ void gauss() {
 //      printf("B[%d] -= B[%d] * m (norm=%d)\n", row, norm, norm);
       cpu_B[row] -= cpu_B[norm] * multiplier;
     }
+//    for(int i = 0 ; i < N ; i++){
+//      printf("B[%d]= %f (norm=%d)\n", i, cpu_B[i], norm);
+//    }
   }
   timing f_e = clk::now();
   /* (Diagonal elements are not normalized to 1.  This is treated in back
    * substitution.)
    */
-
+  print_inputs(cpu_A, cpu_B);
 //  printf("print A and B before back subsitution\n");
 //  print_inputs(cpu_A, cpu_B);
 
@@ -312,32 +327,33 @@ void gauss_tpu() {
   float RMAX = FLT_MIN, RMIN = FLT_MAX;
   int* rows_int = (int*) malloc((N+1)*(N+1)*sizeof(int));
   int* mf_int   = (int*) malloc((N+1)*(N+1)*sizeof(int));
+//  for (norm = 0; norm < N - 1; norm++) {
+//    for (row = norm + 1; row < N; row++) {
+//      multiplier = cpu_A[row][norm] / cpu_A[norm][norm];
+//      for (col = norm; col < N; col++) {
+//	         cpu_A[row][col] -= cpu_A[norm][col] * multiplier;
+//      }
+//      cpu_B[row] -= cpu_B[norm] * multiplier;
+//    }
+//  }
+
+
   for (norm = 0; norm < N - 1; norm++) {
-//    #pragma omp parallel for shared(A, B) private(multiplier,row,col)
-// TODO: prepare matrix: [rows], and matrix: [mutipliers]
-    mfs = clk::now();
     for(int i = 0 ; i < (N-norm+1); i++){
       multiplier = tpu_A[i+norm+1][norm] / tpu_A[norm][norm];
       for(int j = 0 ; j < (N-norm+1) ; j++){
         mf[i*(N-norm+1)+j] = multiplier;// same for each row
       }
     }
-    mfe = clk::now();
-    mfus += std::chrono::duration_cast<std::chrono::nanoseconds>(mfe-mfs).count()/1000.0;
-    rs = clk::now();
     for(int i = 0 ; i < (N-norm-1) ; i++){
       for(int j = 0 ; j < (N-norm) ; j++){
         rows[i*(N-norm+1)+j] = tpu_A[norm][j+norm];
       }
       rows[i*(N-norm+1)+N-norm] = tpu_B[norm];
     }
-    re = clk::now();
-    rus += std::chrono::duration_cast<std::chrono::nanoseconds>(re-rs).count()/1000.0;
 // ========== the gptpu_mul kernel ==========
-//    printf("for norm = %d, (%d)*(%d) = (%d)\n", norm, (N-norm-1), (N-norm+1), (N-norm-1)*(N-norm+1));
-    ks = clk::now();
-//    gptpu_mul(row, mf, row, (N-norm-1), (N-norm+1));
-//    printf("mul shape: %d, %d\n", N-norm-1, N-norm+1);
+    //gptpu_mul(rows_int, mf_int, rows_int, (N-norm-1), (N-norm+1));
+//    mul(rows_int, mf_int, rows_int, (N-norm-1), (N-norm+1));
 // ====== quantize to uint8 =============================
     MMAX = FLT_MIN, MMIN = FLT_MAX;
     RMAX = FLT_MIN, RMIN = FLT_MAX;
@@ -350,46 +366,32 @@ void gauss_tpu() {
     for(int i = 0 ; i < (N-norm-1)*(N-norm+1) ; i++){
       rows_int[i] = (int)((rows[i] / RMAX) * 255);
       mf_int[i]   = (int)((mf[i]   / MMAX) * 255);
-//      printf("rows_int: %d, mf_int: %d, ", rows_int[i], mf_int[i]);
-//      printf("RMAX: %f, RMIN: %f, MMAX: %f, MMIN: %f, norm: %d\n", RMAX, RMIN, MMAX, MMIN, norm);
-//  if(RMIN < 0){printf("i: %d, rows[i]: %f\n", i, rows[i]); getchar();}
     }
     for(int i = 0 ; i < (N-norm-1)*(N-norm+1) ; i++){
-     //rows[i] *= mf[i];
       rows[i] = rows_int[i] * mf_int[i];
     }
     for(int i = 0 ; i < (N-norm-1)*(N-norm+1) ; i++){
       rows[i] = rows[i] * (RMAX / 255) * (MMAX / 255);
-//      printf("i: %d, rows[i]: %f\n", i, rows[i]); 
+    }
+//    mul(rows_int, mf_int, rows_int, (N-norm-1), (N-norm+1));
+    for(int i = 0 ; i < (N-norm-1); i++){
+      for(int j = 0 ; j < (N-norm+1); j++){
+        rows[i*(N-norm+1)+j] = mf[i*(N-norm+1)+j] * rows[i*(N-norm+1)+j];
+      }
     }
 // ====== end quantize ==================================
-//    printf("length = %4d * %4d = %8d\n", N-norm-1, N-norm+1, (N-norm-1)*(N-norm+1));
     cnt += (N-norm-1)*(N+norm+1);
-    ke = clk::now();
-    kus += std::chrono::duration_cast<std::chrono::nanoseconds>(ke-ks).count()/1000.0;
 // ========== write back ==========
-    ws = clk::now();
     for(int i = 0 ; i < (N-norm-1) ; i++){
       for(int j = 0 ; j < (N-norm) ; j++){
         tpu_A[i+norm+1][j+norm] -= rows[i*(N-norm+1)+j];
       }
       tpu_B[i+norm+1] -= rows[i*(N-norm+1)+N-norm]; 
     }   
-    we = clk::now();
-    wus += std::chrono::duration_cast<std::chrono::nanoseconds>(we-ws).count()/1000.0;
-//    for (row = norm + 1; row < N; row++) {
-//      multiplier = A[row][norm] / A[norm][norm];
-//      for (col = norm; col < N; col++) {
-//	         A[row][col] -= A[norm][col] * multiplier;
-//      }
-//      B[row] -= B[norm] * multiplier;
-//    }
   }
-  timing f_e = clk::now();
 //  printf("print A and B before back subsitution\n");
 //  print_inputs(tpu_A, tpu_B);
   /* Back substitution */
-  timing b_s = clk::now();
   for (row = N - 1; row >= 0; row--) {
     tpu_X[row] = tpu_B[row];
     for (col = N-1; col > row; col--) {
@@ -397,17 +399,21 @@ void gauss_tpu() {
     }
     tpu_X[row] /= tpu_A[row][row];
   }
-  timing b_e = clk::now();
-  double f_us = std::chrono::duration_cast<std::chrono::nanoseconds>(f_e-f_s).count()/1000.0;
-  double b_us = std::chrono::duration_cast<std::chrono::nanoseconds>(b_e-b_s).count()/1000.0;
+  //double f_us = std::chrono::duration_cast<std::chrono::nanoseconds>(f_e-f_s).count()/1000.0;
+  //double b_us = std::chrono::duration_cast<std::chrono::nanoseconds>(b_e-b_s).count()/1000.0;
 //  print_X(tpu_X);
-  printf("cnt = %lld\n", cnt);
-  printf("forward  time: %12.3f (us)\n", f_us);
-  printf("->mf     time: %12.3f (us)\n", mfus);
-  printf("->rows   time: %12.3f (us)\n", rus);
-  printf("->kernel time: %12.3f (us)\n", kus);
-  printf("->WB     time: %12.3f (us)\n", wus);
-  printf("backward time: %12.3f (us)\n", b_us);
-  printf("total    time: %12.3f (us)\n", f_us+b_us);
-  
+//  printf("cnt = %lld\n", cnt);
+//  printf("forward  time: %12.3f (us)\n", f_us);
+//  printf("->mf     time: %12.3f (us)\n", mfus);
+//  printf("->rows   time: %12.3f (us)\n", rus);
+//  printf("->kernel time: %12.3f (us)\n", kus);
+//  printf("->WB     time: %12.3f (us)\n", wus);
+//  printf("backward time: %12.3f (us)\n", b_us);
+//  printf("total    time: %12.3f (us)\n", f_us+b_us);
 }
+    
+
+
+
+
+
