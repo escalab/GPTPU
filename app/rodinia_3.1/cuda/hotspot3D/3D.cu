@@ -92,10 +92,9 @@ void readinput(float *vect, int grid_rows, int grid_cols, int layers, char *file
     char str[STR_SIZE];
     float val;
 
-    if( (fp  = fopen(file, "r" )) ==0 ){
-      printf("fp: %d\n", fp == nullptr);
+    if( (fp  = fopen(file, "r" )) ==0 )
       fatal( "The file was not opened" );
-    }
+
 
     for (i=0; i <= grid_rows-1; i++) 
       for (j=0; j <= grid_cols-1; j++)
@@ -240,7 +239,7 @@ void computeTempTPU_conv(float *pIn/*powerIn*/, float* tIn/*tempCpoy*/, float *t
     cb = ct = 0.000067;
     stepDivCap = 1.365333;
 
-    int c, b, t;//,w,e,n,s,b,t;
+    int c,w,e,n,s,b,t;
     int x,y,z;
     int i = 0, j = 0;
 
@@ -288,8 +287,8 @@ void computeTempTPU_conv(float *pIn/*powerIn*/, float* tIn/*tempCpoy*/, float *t
 // Notes that:
 // in and out dims are the same
     float max_coef  = MAX(MAX(MAX(MAX(ce, cw), cn), cs), cc);
-    //float min_coef  = MIN(MIN(MIN(MIN(ce, cw), cn), cs), cc);
-    //float range_coef = max_coef - min_coef;
+    float min_coef  = MIN(MIN(MIN(MIN(ce, cw), cn), cs), cc);
+    float range_coef = max_coef - min_coef;
     float f_scale = (float)UCHAR_MAX/(float)max_coef; 
     printf("%d, %d, f_scale = %f\n",   (int)((float)((float)ce/(float)max_coef)*UCHAR_MAX), UCHAR_MAX, f_scale); 
     int* filter = (int*) malloc(9*sizeof(int));
@@ -322,7 +321,7 @@ void computeTempTPU_conv(float *pIn/*powerIn*/, float* tIn/*tempCpoy*/, float *t
         //scale = tIn_scale * f_scale * (avoid flow controlling scale)
         gptpu_s = clk::now();
         //run_us[z] += gptpu_conv2D(tIn_int[z], filter, tOut_int[z], nx, ny, 3, 3, "replication"); // TODO: an scale factor for fixed point scaling
-        conv2D_cpu(tIn_int[z], filter, tOut_int[z], nx, ny); // TODO: an scale factor for fixed point scaling
+        //conv2D_cpu(tIn_int[z], filter, tOut_int[z], nx, ny); // TODO: an scale factor for fixed point scaling
         gptpu_e = clk::now();
         gptpu_us   += std::chrono::duration_cast<std::chrono::nanoseconds>(gptpu_e - gptpu_s).count()/1000.0;  
       }
@@ -388,8 +387,8 @@ void computeTemp_multi_layer_TPU(float *pIn/*powerIn*/, float* tIn/*tempCpoy*/, 
     cc = 0.453667;
     cb = ct = 0.000067;
     stepDivCap = 1.365333;
-    int c,w,e,n,s;//,b,t;
-    int x,y;//,z;
+    int c,w,e,n,s,b,t;
+    int x,y,z;
     int i = 0;
     do{
       //for(z = 0 ; z < nz; z++){
@@ -510,21 +509,21 @@ void usage(int argc, char **argv)
 
 int main(int argc, char** argv)
 {
-    if (argc != 6)
+    if (argc != 7)
     {
         usage(argc,argv);
     }
 
-    char *pfile, *tfile;//, *ofile;
+    char *pfile, *tfile, *ofile;
     int iterations = atoi(argv[3]);
 
     pfile = argv[4];
     tfile = argv[5];
-    //ofile = argv[6];
+    ofile = argv[6];
     int numCols = atoi(argv[1]);
     int numRows = atoi(argv[1]);
     int layers = atoi(argv[2]);
-    printf("size: %d, layers: %d, iter: %d\n", numCols, layers, iterations);
+//    printf("size: %d, layers: %d, iter: %d\n", numCols, layers, iterations);
     /* calculating parameters*/
 
     float dx = chip_height/numRows;
@@ -556,34 +555,12 @@ int main(int argc, char** argv)
     readinput(powerIn,numRows, numCols, layers,pfile);
     readinput(tempIn, numRows, numCols, layers, tfile);
 
-// =====manipulate input data range ========
-    float PMAX = FLT_MIN;
-    float PMIN = FLT_MAX;
-    float TMAX = FLT_MIN;
-    float TMIN = FLT_MAX;
-    for(int i = 0 ; i < numRows*numCols*layers; i++){
-      if(powerIn[i] > PMAX){ PMAX = powerIn[i]; } 
-      if(powerIn[i] < PMIN){ PMIN = powerIn[i]; } 
-      if(tempIn[i] > TMAX){ TMAX = tempIn[i]; } 
-      if(tempIn[i] < TMIN){ TMIN = tempIn[i]; } 
-    }
-//    std::cout << "power max: " << PMAX << ", min: " << PMIN << std::endl;
-//    std::cout << "temp  max: " << TMAX << ", min: " << TMIN << std::endl;
-// =========================================
-    for(int i = 0 ; i < numRows*numCols*layers ; i++){
-      tempIn[i] = (tempIn[i]/TMAX)*(2147483647);
-    }
-   
-
-
-
     memcpy(tempCopy,tempIn, size * sizeof(float));
     memcpy(TPUCopy,tempIn, size * sizeof(float));
     memcpy(multiCopy,tempIn, size * sizeof(float));
 
     timing GPU_s = clk::now();
-    //hotspot_opt1(powerIn, tempIn, tempOut, numCols, numRows, layers, Cap, Rx, Ry, Rz, dt,iterations);
-    computeTempTPU_conv(powerIn, tempCopy,  answer, numCols, numRows, layers, Cap, Rx, Ry, Rz, dt,iterations);
+    hotspot_opt1(powerIn, tempIn, tempOut, numCols, numRows, layers, Cap, Rx, Ry, Rz, dt,iterations);
     timing GPU_e = clk::now();
     timing CPU_s = clk::now();
     computeTempCPU(powerIn, tempCopy,  answer, numCols, numRows, layers, Cap, Rx, Ry, Rz, dt,iterations);
@@ -592,48 +569,47 @@ int main(int argc, char** argv)
     char *model_name;
     model_name = (char*) malloc(100*sizeof(char));
 
-    strcpy(model_name, "./hotspot3D.tflite"); 
+    strcpy(model_name, "./hotspot3D_ex_model.tflite"); 
 
-//    std::cout << "start run on tpu ..." << std::endl;
+    std::cout << "start run on tpu ..." << std::endl;
     run_a_hotspot(model_name, 1, numCols/*=numRows*/, powerIn, TPUCopy, TPUanswer);
+
 
 // ===== get some stats =====
     float ref_max = FLT_MIN;
     float ref_min = FLT_MAX;
-    double ref_sum = 0;
+    float ref_sum = 0;
     float ref_mean = 0;
     float ref_range = 0;
     int tpu_max = INT_MIN;
     int tpu_min = INT_MAX;
-    long long int tpu_sum = 0;
+    int tpu_sum = 0;
     int tpu_mean = 0;
     int tpu_range = 0;
     float ftpu_max = FLT_MIN;
     float ftpu_min = FLT_MAX;
-    double ftpu_sum = 0;
+    float ftpu_sum = 0;
     float ftpu_mean = 0;
     float ftpu_range = 0;
 
-    std::cout << "start to collect stats..." << std::endl;   
-    std::cout << "size: " << size << ",numCols: " << numCols << ", numRows: " << numRows << ", layers: " << layers << std::endl;
+//    std::cout << "start to collect stats..." << std::endl;   
     for(int i = 0 ; i < numCols*numRows; i++){
       if(answer[i] > ref_max){ ref_max = answer[i]; }
       if(answer[i] < ref_min){ ref_min = answer[i]; }
       if(TPUanswer[i] > tpu_max){ tpu_max = TPUanswer[i]; }
       if(TPUanswer[i] < tpu_min){ tpu_min = TPUanswer[i]; }
       ref_sum += answer[i];
-//      std::cout << "current mean: " << ref_sum / (i+1) << ", item: " << answer[i] << ", i: " << i << ", current_ref_sum: " << ref_sum << std::endl;
       tpu_sum += TPUanswer[i];
     }
     ref_range = ref_max - ref_min;
     ref_mean = ref_sum / (numCols*numRows);
     tpu_range = tpu_max - tpu_min;
     tpu_mean = (int)(tpu_sum / (numCols*numRows));
-    std::cout << "ref max: " << ref_max << ", mean: " << ref_mean << ", min: " << ref_min << ", range: " << ref_range << ", sum: " << ref_sum << std::endl;
-    std::cout << "TPU max: " << tpu_max << ", mean: " << tpu_mean << ", min: " << tpu_min << ", range: " << tpu_range << ", sum: " << tpu_sum <<  std::endl;
+//    std::cout << "ref max: " << ref_max << ", mean: " << ref_mean << ", min: " << ref_min << ", range: " << ref_range << std::endl;
+//    std::cout << "TPU max: " << tpu_max << ", mean: " << tpu_mean << ", min: " << tpu_min << ", range: " << tpu_range << std::endl;
 
 // scaling back to expected range ==============
-    std::cout << "start to scaling back to float" << std::endl;
+//    std::cout << "start to scaling back to float" << std::endl;
     for(int i = 0 ; i < numCols*numRows ; i++){
       TPUanswer_float[i] = TPUanswer[i] - (float)tpu_mean;
       TPUanswer_float[i] = ( TPUanswer_float[i] / tpu_range ) * ref_range;
@@ -646,14 +622,14 @@ int main(int argc, char** argv)
     }
     ftpu_range = ftpu_max - ftpu_min;
     ftpu_mean = ftpu_sum / (numCols * numRows);
-    std::cout << "fTPU max: " << ftpu_max << ", mean: " << ftpu_mean << ", min: " << ftpu_min << ", range: " << ftpu_range << std::endl;
-    std::cout << "scaled back float output from tpu: " << std::endl;
-    for(int i = 0 ; i < 10 ; i++){
-      for(int j = 0 ;  j < 10 ; j++){
-        std::cout << TPUanswer_float[i*numCols+j] << " ";
-      }
-      std::cout << std::endl;
-    }
+//    std::cout << "fTPU max: " << ftpu_max << ", mean: " << ftpu_mean << ", min: " << ftpu_min << ", range: " << ftpu_range << std::endl;
+//    std::cout << "scaled back float output from tpu: " << std::endl;
+//    for(int i = 0 ; i < 10 ; i++){
+//      for(int j = 0 ;  j < 10 ; j++){
+//        std::cout << TPUanswer_float[i*numCols+j] << " ";
+//      }
+//      std::cout << std::endl;
+//    }
 
     timing multi_s = clk::now();
 //    computeTemp_multi_layer_TPU(powerIn, multiCopy,  multiTPUanswer, numCols, numRows, layers, Cap, Rx, Ry, Rz, dt,iterations);
@@ -685,27 +661,29 @@ int main(int argc, char** argv)
 //    printf("CPU               mean: %f\n", CPU_avg);
 //    printf("CPU and TPU       RMSE: %f over %d elements (RMSE%% = %f%%)\n", RMSE, numCols*numRows*layers, (RMSE/CPU_avg)*100);
 //    printf("CPU and TPU error rate: %f %%\n", (error_rate/CPU_avg)*100);
-    double GPU_us = std::chrono::duration_cast<std::chrono::nanoseconds>(GPU_e - GPU_s).count()/1000.0;  
-    double CPU_us = std::chrono::duration_cast<std::chrono::nanoseconds>(CPU_e - CPU_s).count()/1000.0;  
-    double multi_us = std::chrono::duration_cast<std::chrono::nanoseconds>(multi_e - multi_s).count()/1000.0;  
-    double TPU_us = std::chrono::duration_cast<std::chrono::nanoseconds>(TPU_e - TPU_s).count()/1000.0;  
-    float acc = accuracy(tempOut,answer,numRows*numCols*layers);
-    printf("GPU   time: %12.3f (us)\n", GPU_us);
-    printf("multi time: %12.3f (us), multi_error_cnt = %d\n", multi_us, multi_error_cnt);
-    printf("CPU   time: %12.3f (us), GPU and CPU Accuracy: %e = %12.8f\n", CPU_us, acc, acc);
-    float acc2= accuracy(tempOut,TPUanswer_float,numRows*numCols*layers);
-    printf("TPU   time: %12.3f (us), GPU and TPU Accuracy: %e = %12.8f\n", TPU_us, acc2, acc2);
-    float ep = 1e-4;
-    bool ans = (fabs(acc - acc2) < ep)?true:false;
-    printf("TPU accuracy compare: %d with epsilon = %f\n", ans, ep);
+//    double GPU_us = std::chrono::duration_cast<std::chrono::nanoseconds>(GPU_e - GPU_s).count()/1000.0;  
+//    double CPU_us = std::chrono::duration_cast<std::chrono::nanoseconds>(CPU_e - CPU_s).count()/1000.0;  
+//    double multi_us = std::chrono::duration_cast<std::chrono::nanoseconds>(multi_e - multi_s).count()/1000.0;  
+//    double TPU_us = std::chrono::duration_cast<std::chrono::nanoseconds>(TPU_e - TPU_s).count()/1000.0;  
+//    float acc = accuracy(tempOut,answer,numRows*numCols*layers);
+//    printf("GPU   time: %12.3f (us)\n", GPU_us);
+//    printf("multi time: %12.3f (us), multi_error_cnt = %d\n", multi_us, multi_error_cnt);
+//    printf("CPU   time: %12.3f (us), GPU and CPU Accuracy: %e = %12.8f\n", CPU_us, acc, acc);
+//    float acc2= accuracy(tempOut,TPUanswer_float,numRows*numCols*layers);
+//    printf("TPU   time: %12.3f (us), GPU and TPU Accuracy: %e = %12.8f\n", TPU_us, acc2, acc2);
+//    float ep = 1e-4;
+//    bool ans = (fabs(acc - acc2) < ep)?true:false;
+//    printf("TPU accuracy compare: %d with epsilon = %f\n", ans, ep);
   
-    for(int i = 0 ; i < 10 ; i++){
-      printf("powerIn: %f, tempIn: %f| CPU: %f, TPU: %f\n", powerIn[i], tempIn[i], answer[i], TPUanswer_float[i]);
-    }
+//    for(int i = 0 ; i < 10 ; i++){
+//      printf("powerIn: %f, tempIn: %f| CPU: %f, TPU: %f\n", powerIn[i], tempIn[i], answer[i], TPUanswer_float[i]);
+//    }
 //    writeoutput(tempOut,numRows, numCols, layers, ofile);
 
     free(tempIn);
     free(tempOut); free(powerIn);
+    free(tempCopy); free(TPUCopy);  free(multiCopy);
+    free(answer); free(TPUanswer);  free(TPUanswer_float); free(model_name);
     return 0;
 }	
 

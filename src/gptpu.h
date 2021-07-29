@@ -202,7 +202,7 @@ void search_random_conv_optimal(std::string& in_dir, int iter, int sec);
 void search_256mmblk_optimal(std::string& in_dir, int iter); 
 void run_a_model(std::string& model_path, int iter, int input_size); 
 void run_a_pagerank(std::string& model_path, int iter, int input_size); 
-void run_a_hotspot(char* model_path, int iter, int input_size, float *pIn, float *tIn, int *tOut); 
+void run_a_hotspot(const char* model_path, int iter, int input_size, float *pIn, float *tIn, int *tOut); 
 void run_a_model_16x8(std::string& model_path, int iter); //experimental
 void run_a_model_parallel(std::string& model_path, int iter, int dev_cnt); 
 

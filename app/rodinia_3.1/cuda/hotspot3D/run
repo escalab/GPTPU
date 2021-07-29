@@ -1,2 +1,2 @@
 # ./3D 2048 1 1 ../../data/hotspot3D/power_512x8 ../../data/hotspot3D/temp_512x8 output.out
-./3D 1024 1 1 ../../data/hotspot3D/power_8192x8 ../../data/hotspot3D/temp_8192x8 #output.out
+./3D 256 1 1 ../../data/hotspot3D/power_8192x8 ../../data/hotspot3D/temp_8192x8 output.out

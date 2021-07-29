@@ -413,7 +413,8 @@ void open_devices(int opening_order, int wanted_dev_cnt){
   long long int list_ns = 0;
   long long int open_ns = 0;
   set_dev_cnt(wanted_dev_cnt);
-  data_dir = (ramdisk == 1)?("/mnt/ramdisk/"):("./../data/");
+  //data_dir = (ramdisk == 1)?("/mnt/ramdisk/"):("./../data/");
+  data_dir = (ramdisk == 1)?("/mnt/ramdisk/"):("./");
   if(DEV_OPENED == false){ // once for all during process lifetime
     DEV_OPENED = true;
     list_ns = ListTheDevices(VERBOSE, local_dev_cnt); // once for all
@@ -1528,12 +1529,10 @@ void run_a_pagerank(std::string& model_path, int iter, int input_size){
   set_scale(255);
   
   // Call libedgepu runtime library to build model
-  std::cout << "build model..., model_path: " << model_path <<  std::endl;
   build_model(model_path, 0/*model_id*/);
 
   // Call libedgetpu runtime library to build interpreter
   // At this point, model is pre-decided which edgeTPU it needs to go to.
-  std::cout << "build itpr..." << std::endl;
   build_interpreter(0/*tpu_id*/, 0/*model_id*/);
 
   // Allocate required size of input array
@@ -1547,9 +1546,9 @@ void run_a_pagerank(std::string& model_path, int iter, int input_size){
     in_a[i] = rand()%2;
   }
 
-  std::cout << "populating input..." << std::endl;
+  //std::cout << "populating input..." << std::endl;
   populate_input(in_a, size/*a pre-determinded size*/, 0);
-  std::cout << "start invoking..." << std::endl;
+  //std::cout << "start invoking..." << std::endl;
   s = clk::now();
 
   // The actual invoke function
@@ -1558,7 +1557,7 @@ void run_a_pagerank(std::string& model_path, int iter, int input_size){
   e = clk::now();
 
   // Note: output reading phase is ignored in this simple example.
-  std::cout << "populating output ..." << std::endl;
+  //std::cout << "populating output ..." << std::endl;
   simple_populate_output(out_c, 0, 0);
 
   int MAX = 0;
@@ -1592,11 +1591,12 @@ void run_a_pagerank(std::string& model_path, int iter, int input_size){
   for(int i = 0 ; i < size ; i++){
     in_rank1[i] =  1.0 / size;
   }
-  std::ifstream f ("~/GPTPU/data/pagerank_1K_iter1_weight.txt", std::ios::in | std::ios::binary);
+  std::string name = "~/GPTPU/src/pagerank_1K_iter1_weight.txt";
+  std::ifstream f (name/*"~/GPTPU/data/pagerank_1K_iter1_weight.txt"*/, std::ios::in | std::ios::binary);
 
   if(!f.is_open()){
-    std::cout << "error code: " << strerror(errno) << std::endl;
-    exit(0);
+//    std::cout << "error code: " << strerror(errno) << ", name: " << name << std::endl;
+//    exit(0);
   }
   int idx = 0 ;
   union weight_byte{
@@ -1615,7 +1615,7 @@ void run_a_pagerank(std::string& model_path, int iter, int input_size){
 //    std::cout << std::endl;
 //  }
   int page_iter = 1;//= (size == 1024)?5:(size == 2048)?4:(size == 512)?6:(size == 256)?6:(size == 128)?7:1;
-  std::cout << __func__ << ", iter=" << page_iter << std::endl;
+  //std::cout << __func__ << ", iter=" << page_iter << std::endl;
   for(int i = 0 ; i < page_iter ; i++){
     cblas_dgemv(CblasRowMajor, CblasNoTrans, size, size, 1, w1, size, in_rank1, 1, 0, out_rank1, 1);
     tmp = in_rank1; in_rank1 = out_rank1; out_rank1 = tmp;
@@ -1634,9 +1634,9 @@ void run_a_pagerank(std::string& model_path, int iter, int input_size){
   printf("RMSE: %f, out_rank1 avg: %f, RMSE%%: %f %%, errorr rate: %f %% (rate: %f)\n", sqrt(MSE), rank1_mean, (sqrt(MSE)/rank1_mean)*100, (rate/rank1_mean)*100, rate);
 
   us = (std::chrono::duration_cast<std::chrono::nanoseconds>(e - s).count()/1000.0);
-  printf("total invoke time: %12.3f (us)\n", us);
+  //printf("total invoke time: %12.3f (us)\n", us);
   us = (std::chrono::duration_cast<std::chrono::nanoseconds>(e - s).count()/1000.0)/iter;
-  printf("avg. invoke time: %12.3f (us), iter = %d.\n", us, iter);
+  //printf("avg. invoke time: %12.3f (us), iter = %d.\n", us, iter);
   //free(in_a);
   //free(out_c);
 }
@@ -1709,7 +1709,7 @@ void computeTempCPU(float *pIn/*powerIn*/, float* tIn/*tempCpoy*/, float *tOut/*
 }
 
 
-void run_a_hotspot(char* c_model_path, int iter, int input_size, float* pIn, float* tIn, int *tOut){
+void run_a_hotspot(const char* c_model_path, int iter, int input_size, float* pIn, float* tIn, int *tOut){
   std::string model_path(c_model_path);
   double hot_time_sum = 0;
   int hot_cnt = 0;
@@ -1751,7 +1751,7 @@ void run_a_hotspot(char* c_model_path, int iter, int input_size, float* pIn, flo
 
 // ===== TPU part =====================================
   // Assign # of edgTPUs ypu want to use
-  set_dev_cnt(10);
+  set_dev_cnt(1);
 
   // Device initialization
   open_devices(0, 1);
@@ -1769,7 +1769,7 @@ void run_a_hotspot(char* c_model_path, int iter, int input_size, float* pIn, flo
 
   // Call libedgetpu runtime library to build interpreter
   // At this point, model is pre-decided which edgeTPU it needs to go to.
-  build_interpreter(rand()%10/*tpu_id*/, 0/*model_id*/);
+  build_interpreter(0/*tpu_id*/, 0/*model_id*/);
 
   // Allocate required size of input array
   // You need to know how large the input array is required, otherwise may segfault
@@ -1782,7 +1782,7 @@ void run_a_hotspot(char* c_model_path, int iter, int input_size, float* pIn, flo
 
   in_a  = (int*)malloc(2*size*size*sizeof(int));
   out_c = (int*) calloc(size*size, sizeof(int));
-  std::cout << __func__ << ", single input_size: " << input_size << "in_a size: " << 2*size*size << ", out_c size: " << size*size << std::endl;
+//  std::cout << __func__ << ", single input_size: " << input_size << "in_a size: " << 2*size*size << ", out_c size: " << size*size << std::endl;
   int total_size = input_size * input_size;
 // qunatize float real data to uint8 array for edgeTPU
   float p_max = 0;
@@ -1797,7 +1797,7 @@ void run_a_hotspot(char* c_model_path, int iter, int input_size, float* pIn, flo
   unsigned long long int sum = 0;  
 
   for(int idx = 0 ; idx < ((input_size / 256) * (input_size / 256)) ; idx++){
-    std::cout << "idx: " << idx << std::endl;
+//    std::cout << "idx: " << idx << std::endl;
     p_max = 0;
     t_max = 0;
     for(int i = 0 ; i < total_size ; i++){
