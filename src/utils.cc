@@ -1639,7 +1639,9 @@ void run_a_pagerank(std::string& model_path, int iter, int input_size){
   //printf("avg. invoke time: %12.3f (us), iter = %d.\n", us, iter);
   //free(in_a);
   //free(out_c);
+  GPTPU_cleanup();
 }
+
 #define STR_SIZE 256
 void fatal(const char *s){
   fprintf(stderr, "Error: %s\n", s);
@@ -1882,6 +1884,7 @@ void run_a_hotspot(const char* c_model_path, int iter, int input_size, float* pI
 //  printf("avg. invoke time: %12.3f (us), iter = %d.\n", us, iter);
   //free(in_a);
   //free(out_c);
+  GPTPU_cleanup();
 }
 
 struct args_struct{

@@ -243,4 +243,5 @@ int gptpu_tf_crop(int*a, int*c, int A, int B, int blk_row, int blk_col, int star
 
 int gptpu_black(int* a, int* b, int*c, int A, int B);
 
+void GPTPU_cleanup(void);
 #endif

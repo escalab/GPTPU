@@ -649,8 +649,6 @@ openctpu_dimension* openctpu_alloc_dimension(int dim, ...){
 
 openctpu_buffer* openctpu_create_buffer(openctpu_dimension* dim, void* data, openctpu_config* config, bool b_major, int tensor_type){
 // there are three types of buffer: model, input data, output buffer
-std::cout << "config.exact_mode: " << config->get_exact_mode() << std::endl;
-std::cout << "config.mm256_mode: " << config->get_mm256_mode() << ", tensor type: " << tensor_type << std::endl;
   openctpu_buffer* ret = new openctpu_buffer();
   ret->set_config(config);
   ret->set_flags(b_major, tensor_type); // set tensor-wise flag only
@@ -669,7 +667,7 @@ std::cout << "config.mm256_mode: " << config->get_mm256_mode() << ", tensor type
 //    ret->config->set_blks(x,y,z); // for float, no need to do sub-blocking
 //  }
   ret->config->get_blks(blk_A, blk_B, blk_C);
-  std::cout << "A: " << A << ", B: " << B << ", C: " << C << ", blk_A: " << blk_A << ", blk_B: " << blk_B << ", blk_C: " << blk_C << std::endl;
+//  std::cout << "A: " << A << ", B: " << B << ", C: " << C << ", blk_A: " << blk_A << ", blk_B: " << blk_B << ", blk_C: " << blk_C << std::endl;
   bool exact_mode = ret->config->get_exact_mode();
   int chunk_num   = ret->config->get_chunk_num();
   bool mm256_mode = ret->config->get_mm256_mode();
@@ -704,7 +702,7 @@ std::cout << "config.mm256_mode: " << config->get_mm256_mode() << ", tensor type
       INN_BLK_REM = tile_info.INN_BLK_REM;
       COL_BLK_REM = tile_info.COL_BLK_REM;
     }
-    std::cout << "A: " << A << ", B: " << B << ", C: " << C << ", blk_A: " << blk_A << ", blk_B: " << blk_B << ", blk_C: " << blk_C << ", data_array_size: " << data_array_size << std::endl;
+//    std::cout << "A: " << A << ", B: " << B << ", C: " << C << ", blk_A: " << blk_A << ", blk_B: " << blk_B << ", blk_C: " << blk_C << ", data_array_size: " << data_array_size << std::endl;
     ret->get_conv_shape(IN_W, IN_H, IN_C, OUT_C, F_W, F_H, S_W, S_H);
 //std::cout << __func__ << ": IN_W: " << IN_W << ",IN_H: " << IN_H << ",IN_C: " << IN_C << ",OUT_C: " << OUT_C << ",F_W: " << F_W << ",F_H: " << F_H << std::endl;
     char* data_array = (char*) malloc(data_array_size*sizeof(char));
@@ -728,7 +726,7 @@ std::cout << "config.mm256_mode: " << config->get_mm256_mode() << ", tensor type
           std::string matrix_path = (mm256_mode == true)?
                                     (data_dir+"conv_model_tflite/conv_model_quant_"+itoa(IN_W)+"x"+itoa(IN_H)+"x"+itoa(IN_C)+"x"+itoa(F_W)+"x"+itoa(F_H)+"x"+itoa(S_W)+"x"+itoa(S_H)+"_256exact_"+itoa(i)+"x"+itoa(j)+"_outof_"+itoa(INN_BLK_CNT)+"x"+itoa(COL_BLK_CNT)+"_edgetpu.tflite")
                                    :(data_dir+"conv_model_tflite/conv_model_quant_"+itoa(IN_W)+"x"+itoa(IN_H)+"x"+itoa(IN_C)+"x"+itoa(F_W)+"x"+itoa(F_H)+"x"+itoa(S_W)+"x"+itoa(S_H)+"_2048based_"+itoa(i)+"x"+itoa(j)+"_outof_"+itoa(INN_BLK_CNT)+"x"+itoa(COL_BLK_CNT)+"_chunk"+itoa(w_chunk_idx)+"_of"+itoa(chunk_num)+"_edgetpu.tflite");
-std::cout << __func__ << ": matrix_path " << matrix_path << ", data_dir: " << data_dir << std::endl;
+//std::cout << __func__ << ": matrix_path " << matrix_path << ", data_dir: " << data_dir << std::endl;
           if(file_exist(template_path) == false && template_created == false){
             template_created = true; // once for all same shape blocks
             tf_creates_tflite_and_template(); // shorten 
@@ -3729,5 +3727,9 @@ void gptpu_pagerank(double* w, double* in_rank, double* out_rank, int size, int 
   for(int i = 0 ; i < 10 ; i ++){
     printf("out_rank[%2d]: %f\n", i, out_rank[i]);
   }
+}
+
+void GPTPU_cleanup(void){
+  edgetpu_cleanup(); // clean up vectors: Itpr and model
 }
 
