@@ -1,6 +1,6 @@
 # GPTPU: General-Purpose Computing on (Edge) Tensor Processing Units
 
-Welcome to the repository of ESCAL @ UCR's GPTPU project! We aim at demonstrating the power of matrix processing units (MXUs) that are now ubiquitous in all types of computing platforms. This project chooses Google's Edge TPU -- a "relatively" open archtecture that allows everyone to purchase and integrate into their systems. In our preliminary results, we achieve 2.46x speedup over one single high-end CPU core. You may reference our arVix paper 
+Welcome to the repository of ESCAL @ UCR's GPTPU project! We aim at demonstrating the power of matrix processing units (MXUs) that are now ubiquitous in all types of computing platforms. This project chooses Google's Edge TPU -- a "relatively" open archtecture that allows everyone to purchase and integrate into their systems. In our preliminary results, we achieve 2.46x speedup over one single high-end CPU core. You may reference our arXiv paper 
 https://arxiv.org/pdf/2107.05473.pdf or the paper coming up in SC21 for more information.
 
 # Hardware installation
@@ -11,7 +11,7 @@ or a USB edge TPU accelerator to installed in your system.
 Once you have the Edge TPUs, please follow Google's document to install their drivers and toolchains before installing our GPTPU framework.
 https://coral.ai/docs/m2/get-started/#2-install-the-pcie-driver-and-edge-tpu-runtime
 
-You may also reference Section 3.1 of our arVix paper to build a multi-Edge-TPU machine (a lot cheaper) or purchase ASUS's 8x Edge TPU PCIe card https://iot.asus.com/products/AI-accelerator/AI-Accelerator-PCIe-Card/
+You may also reference Section 3.1 of our arXiv paper to build a multi-Edge-TPU machine (a lot cheaper) or purchase ASUS's 8x Edge TPU PCIe card https://iot.asus.com/products/AI-accelerator/AI-Accelerator-PCIe-Card/
 
 # Install GPTPU library (Our contribution)
 ## Compile all benchmarks
