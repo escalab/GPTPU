@@ -3,6 +3,9 @@
 Welcome to the repository of ESCAL @ UCR's GPTPU project! We aim at demonstrating the power of matrix processing units (MXUs) that are now ubiquitous in all types of computing platforms. This project chooses Google's Edge TPU -- a "relatively" open archtecture that allows everyone to purchase and integrate into their systems. In our preliminary results, we achieve 2.46x speedup over one single high-end CPU core. You may reference our arXiv paper 
 https://arxiv.org/pdf/2107.05473.pdf or the paper coming up in SC21 for more information.
 
+[![DOI](https://zenodo.org/badge/392392831.svg)](https://zenodo.org/badge/latestdoi/392392831)
+
+
 # Hardware installation
 You will need an M.2 version of the edge TPU (recommeded)
 https://coral.ai/docs/m2/get-started/
