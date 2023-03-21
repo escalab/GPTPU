@@ -1,0 +1,6 @@
+[submodule "libedgetpu"]
+	path = libedgetpu
+	url = git@github.com:jk78346/libedgetpu.git
+[submodule "gasket_driver"]
+	path = gasket_driver
+	url = git@github.com:jk78346/gasket-driver.git
